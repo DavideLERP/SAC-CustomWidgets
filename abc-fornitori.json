@@ -3,7 +3,7 @@
   "vendor": "Local Prototype",
   "license": "",
   "id": "com.example.sac.abcfornitori",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "name": "ABC Fornitori",
   "newInstancePrefix": "ABCFornitori",
   "description": "Frontend ABC supplier analysis tables for SAP Analytics Cloud stories.",
@@ -11,7 +11,7 @@
     {
       "kind": "main",
       "tag": "com-example-sac-abc-fornitori",
-      "url": "https://davidelerp.github.io/SAC-CustomWidgets/abc-fornitori.js?v=0.1.3",
+      "url": "https://davidelerp.github.io/SAC-CustomWidgets/abc-fornitori.js?v=0.1.4",
       "integrity": "",
       "ignoreIntegrity": true
     }

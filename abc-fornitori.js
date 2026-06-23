@@ -273,7 +273,7 @@
           <table class="kpi-table">
             <thead>
               <tr>
-                ${header.map((cell) => `<th>${this._escape(cell)}</th>`).join("")}
+                ${header.map((cell, index) => `<th class="${index > 0 ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
               </tr>
             </thead>
             <tbody>
@@ -452,7 +452,6 @@
       return `
         <section class="detail-card">
           <div class="detail-toolbar">
-            <span>Dettaglio fornitori</span>
             ${this._renderTableMenu("data-export-detail")}
           </div>
           <div class="table-wrap">
@@ -683,7 +682,7 @@
           .detail-toolbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 8px;
             min-height: 30px;
             padding: 3px 8px;
