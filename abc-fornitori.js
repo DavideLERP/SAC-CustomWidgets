@@ -273,7 +273,7 @@
           <table class="kpi-table">
             <thead>
               <tr>
-                ${header.map((cell, index) => `<th class="${index > 0 ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
+                ${header.map((cell, index) => `<th class="${index > 0 ? "kpi-indicator-head" : "kpi-dimension-head"}">${this._escape(cell)}</th>`).join("")}
               </tr>
             </thead>
             <tbody>
@@ -665,6 +665,14 @@
           .num {
             text-align: right;
             font-variant-numeric: tabular-nums;
+          }
+
+          .kpi-table th.kpi-dimension-head {
+            text-align: left !important;
+          }
+
+          .kpi-table th.kpi-indicator-head {
+            text-align: right !important;
           }
 
           .total-row td {
