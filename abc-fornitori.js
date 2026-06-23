@@ -71,6 +71,40 @@
       this._render();
     }
 
+    _downloadCsv(filename, content) {
+      const blob = new Blob(["\uFEFF" + content], {
+        type: "text/csv;charset=utf-8"
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+
+      this.shadowRoot.appendChild(link);
+      link.click();
+      link.remove();
+
+      URL.revokeObjectURL(url);
+    }
+
+    _csvEscape(value) {
+      const text = String(value || "");
+
+      if (text.indexOf(";") >= 0 || text.indexOf("\"") >= 0 || text.indexOf("\n") >= 0) {
+        return "\"" + text.replace(/"/g, "\"\"") + "\"";
+      }
+
+      return text;
+    }
+
+    _rowsToCsv(rows) {
+      return rows
+        .map((row) => row.map((cell) => this._csvEscape(cell)).join(";"))
+        .join("\n");
+    }
+
     _parseRows(payload) {
       if (!payload) {
         return [];
@@ -96,7 +130,7 @@
       return match ? match[0] : "";
     }
 
-    _formatDate(value) {
+    _formatDateText(value) {
       const text = String(value || "");
 
       if (text.length === 10 && text.charAt(4) === "-" && text.charAt(7) === "-") {
@@ -107,7 +141,11 @@
         return `${text.substring(6, 8)}/${text.substring(4, 6)}/${text.substring(0, 4)}`;
       }
 
-      return this._escape(text);
+      return text;
+    }
+
+    _formatDate(value) {
+      return this._escape(this._formatDateText(value));
     }
 
     _formatInteger(value) {
@@ -151,6 +189,22 @@
       return this._escape(value);
     }
 
+    _formatDetailCellText(value, index) {
+      if (index === 1) {
+        return this._formatDateText(value);
+      }
+
+      if (index === 2 || index === 5 || index === 6 || index === 9 || index === 10) {
+        return this._formatInteger(value);
+      }
+
+      if (index === 3 || index === 7 || index === 11) {
+        return this._formatPercent(value);
+      }
+
+      return String(value || "");
+    }
+
     _formatKpiCell(value, index) {
       if (index === 1) {
         return this._escape(value);
@@ -165,6 +219,22 @@
       }
 
       return this._escape(value);
+    }
+
+    _formatKpiCellText(value, index) {
+      if (index === 1) {
+        return String(value || "");
+      }
+
+      if (index === 2 || index === 3) {
+        return this._formatInteger(value);
+      }
+
+      if (index === 4 || index === 5) {
+        return this._formatPercent(value);
+      }
+
+      return String(value || "");
     }
 
     _renderKpiSection(headerPayload, rows) {
@@ -201,6 +271,161 @@
       `;
     }
 
+    _getKpiTotal(rows, year) {
+      const totalRow = rows.find((row) => row[0] === year && row[1] === "Totale");
+
+      if (!totalRow) {
+        return {
+          value: "0",
+          count: "0"
+        };
+      }
+
+      return {
+        value: totalRow[2] || "0",
+        count: totalRow[3] || "0"
+      };
+    }
+
+    _getDetailTotalValues(kpiRows) {
+      const yearY = this._yearFromHeader(this._kpiHeaderY);
+      const yearY1 = this._yearFromHeader(this._kpiHeaderY1);
+      const yearY2 = this._yearFromHeader(this._kpiHeaderY2);
+
+      const totalY = this._getKpiTotal(kpiRows, yearY);
+      const totalY1 = this._getKpiTotal(kpiRows, yearY1);
+      const totalY2 = this._getKpiTotal(kpiRows, yearY2);
+
+      const totalYValue = Number(totalY.value);
+      const totalY1Value = Number(totalY1.value);
+      const totalY2Value = Number(totalY2.value);
+
+      const deltaYY1 = Number.isFinite(totalYValue) && Number.isFinite(totalY1Value)
+        ? String(totalYValue - totalY1Value)
+        : "0";
+      const deltaY1Y2 = Number.isFinite(totalY1Value) && Number.isFinite(totalY2Value)
+        ? String(totalY1Value - totalY2Value)
+        : "0";
+
+      const values = [
+        "Totali",
+        "",
+        totalY.value,
+        "1",
+        "",
+        deltaYY1,
+        totalY1.value,
+        "1",
+        "",
+        deltaY1Y2,
+        totalY2.value,
+        "1",
+        ""
+      ];
+
+      return values;
+    }
+
+    _renderDetailTotalRow(header, kpiRows) {
+      const values = this._getDetailTotalValues(kpiRows);
+
+      return `
+        <tr class="detail-total-row">
+          ${header.map((_, index) => {
+            const value = values[index] || "";
+            const isNum = index >= 2 && index !== 4 && index !== 8 && index !== 12;
+            return `<td class="${isNum ? "num" : ""}">${this._formatDetailCell(value, index)}</td>`;
+          }).join("")}
+        </tr>
+      `;
+    }
+
+    _buildDetailCsv() {
+      const header = this._parseHeader(this._detailHeader);
+      const rows = this._parseRows(this._detailData);
+      const kpiRows = this._parseRows(this._kpiData);
+
+      if (header.length === 0) {
+        return "";
+      }
+
+      const csvRows = [header];
+      const totalValues = this._getDetailTotalValues(kpiRows);
+
+      csvRows.push(header.map((_, index) => this._formatDetailCellText(totalValues[index] || "", index)));
+
+      rows.forEach((row) => {
+        csvRows.push(header.map((_, index) => this._formatDetailCellText(row[index] || "", index)));
+      });
+
+      return this._rowsToCsv(csvRows);
+    }
+
+    _buildKpiCsv() {
+      const kpiRows = this._parseRows(this._kpiData);
+      const sections = [
+        {
+          headerPayload: this._kpiHeaderY
+        },
+        {
+          headerPayload: this._kpiHeaderY1
+        },
+        {
+          headerPayload: this._kpiHeaderY2
+        }
+      ];
+      const csvRows = [];
+
+      sections.forEach((section, sectionIndex) => {
+        const header = this._parseHeader(section.headerPayload);
+        const year = this._yearFromHeader(section.headerPayload);
+        const yearRows = kpiRows.filter((row) => row[0] === year);
+
+        if (!year || header.length === 0 || yearRows.length === 0) {
+          return;
+        }
+
+        if (sectionIndex > 0) {
+          csvRows.push([]);
+        }
+
+        csvRows.push([`PIVOT ABC ${year}`]);
+        csvRows.push(header);
+
+        yearRows.forEach((row) => {
+          csvRows.push([
+            this._formatKpiCellText(row[1], 1),
+            this._formatKpiCellText(row[2], 2),
+            this._formatKpiCellText(row[3], 3),
+            this._formatKpiCellText(row[4], 4),
+            this._formatKpiCellText(row[5], 5)
+          ]);
+        });
+      });
+
+      return this._rowsToCsv(csvRows);
+    }
+
+    _exportDetail() {
+      const csv = this._buildDetailCsv();
+
+      if (!csv) {
+        return;
+      }
+
+      this._downloadCsv("ABC_Fornitori_Dettaglio.csv", csv);
+    }
+
+    _exportKpi() {
+      const csv = this._buildKpiCsv();
+
+      if (!csv) {
+        return;
+      }
+
+      this._downloadCsv("ABC_Fornitori_KPI.csv", csv);
+    }
+
     _renderDetailTable(header, rows) {
       if (header.length === 0 || rows.length === 0) {
         return `
@@ -220,6 +445,7 @@
                 </tr>
               </thead>
               <tbody>
+                ${this._renderDetailTotalRow(header, this._parseRows(this._kpiData))}
                 ${rows.map((row) => `
                   <tr>
                     ${header.map((_, index) => {
@@ -252,8 +478,8 @@
             display: block;
             box-sizing: border-box;
             height: 100%;
-            font-family: Arial, Helvetica, sans-serif;
-            color: #1f2937;
+            font-family: "72", "72full", Arial, Helvetica, sans-serif;
+            color: #58595b;
             background: #fff;
           }
 
@@ -266,8 +492,8 @@
             min-height: 320px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            padding: 10px;
+            gap: 10px;
+            padding: 8px;
             overflow: hidden;
             background: #ffffff;
           }
@@ -280,20 +506,43 @@
             min-height: 28px;
           }
 
+          .title-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
           h2 {
             margin: 0;
             font-size: 18px;
             line-height: 1.2;
             font-weight: 700;
-            color: #111827;
+            color: #111111;
           }
 
           .badge {
             border-left: 4px solid ${this._accentColor};
             padding-left: 8px;
             font-size: 12px;
-            color: #6b7280;
+            color: #58595b;
             white-space: nowrap;
+          }
+
+          .export-button {
+            height: 26px;
+            border: 1px solid #b8bec7;
+            border-radius: 2px;
+            padding: 0 10px;
+            background: #ffffff;
+            color: #32363a;
+            font: inherit;
+            font-size: 12px;
+            cursor: pointer;
+          }
+
+          .export-button:hover {
+            background: #f3f6f9;
+            border-color: #6a6d70;
           }
 
           .kpi-grid {
@@ -306,7 +555,7 @@
           .kpi-card,
           .detail-card {
             border: 1px solid #d7dce3;
-            border-radius: 4px;
+            border-radius: 2px;
             background: #ffffff;
             overflow: hidden;
           }
@@ -324,26 +573,28 @@
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
+            font-size: 13px;
           }
 
           th {
-            background: #f3f4f6;
-            color: #111827;
-            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #58595b;
+            border-bottom: 1px solid #4f5255;
             font-weight: 700;
             text-align: left;
             white-space: nowrap;
           }
 
           td {
-            border-bottom: 1px solid #e5e7eb;
-            color: #111827;
+            border-bottom: 1px solid #4f5255;
+            color: #58595b;
+            background: #ffffff;
           }
 
           th,
           td {
-            padding: 5px 7px;
+            height: 24px;
+            padding: 4px 7px;
             vertical-align: middle;
           }
 
@@ -354,7 +605,7 @@
 
           .total-row td {
             font-weight: 700;
-            background: #f9fafb;
+            background: #ffffff;
           }
 
           .detail-card {
@@ -374,11 +625,16 @@
           .detail-table thead th {
             position: sticky;
             top: 0;
-            z-index: 2;
+            z-index: 4;
           }
 
-          .detail-table tbody tr:hover td {
-            background: #fff7d6;
+          .detail-total-row td {
+            position: sticky;
+            top: 25px;
+            z-index: 3;
+            font-weight: 700;
+            background: #ffffff;
+            border-bottom: 1px solid #4f5255;
           }
 
           .abc {
@@ -414,7 +670,11 @@
         <div class="shell">
           <div class="title-row">
             <h2>${this._escape(this._title)}</h2>
-            <div class="badge">${detailRows.length} fornitori</div>
+            <div class="title-actions">
+              <button class="export-button" type="button" data-export="detail">Esporta dettaglio</button>
+              <button class="export-button" type="button" data-export="kpi">Esporta KPI</button>
+              <div class="badge">${detailRows.length} fornitori</div>
+            </div>
           </div>
 
           <div class="kpi-grid">
@@ -426,6 +686,17 @@
           ${this._renderDetailTable(detailHeader, detailRows)}
         </div>
       `;
+
+      const detailButton = this.shadowRoot.querySelector('[data-export="detail"]');
+      const kpiButton = this.shadowRoot.querySelector('[data-export="kpi"]');
+
+      if (detailButton) {
+        detailButton.addEventListener("click", () => this._exportDetail());
+      }
+
+      if (kpiButton) {
+        kpiButton.addEventListener("click", () => this._exportKpi());
+      }
     }
 
     _escape(value) {
