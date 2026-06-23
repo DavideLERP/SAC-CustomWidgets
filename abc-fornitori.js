@@ -173,33 +173,59 @@
       }) + "%";
     }
 
-    _formatDetailCell(value, index) {
-      if (index === 1) {
+    _isDetailDateColumn(label) {
+      return String(label || "") === "Ultimo Acquisto";
+    }
+
+    _isDetailValueColumn(label) {
+      return String(label || "").indexOf("Val. Netto ") === 0;
+    }
+
+    _isDetailPercentColumn(label) {
+      return String(label || "").indexOf("% ABC ") === 0;
+    }
+
+    _isDetailDeltaColumn(label) {
+      return String(label || "").indexOf("Delta ") === 0;
+    }
+
+    _isDetailAbcColumn(label) {
+      return String(label || "").indexOf("ABC ") === 0;
+    }
+
+    _isDetailNumericColumn(label) {
+      return this._isDetailValueColumn(label)
+        || this._isDetailPercentColumn(label)
+        || this._isDetailDeltaColumn(label);
+    }
+
+    _formatDetailCell(value, index, label) {
+      if (this._isDetailDateColumn(label)) {
         return this._formatDate(value);
       }
 
-      if (index === 2 || index === 5 || index === 6 || index === 9 || index === 10) {
-        return this._formatInteger(value);
+      if (this._isDetailPercentColumn(label)) {
+        return this._formatPercent(value);
       }
 
-      if (index === 3 || index === 7 || index === 11) {
-        return this._formatPercent(value);
+      if (this._isDetailValueColumn(label) || this._isDetailDeltaColumn(label)) {
+        return this._formatInteger(value);
       }
 
       return this._escape(value);
     }
 
-    _formatDetailCellText(value, index) {
-      if (index === 1) {
+    _formatDetailCellText(value, index, label) {
+      if (this._isDetailDateColumn(label)) {
         return this._formatDateText(value);
       }
 
-      if (index === 2 || index === 5 || index === 6 || index === 9 || index === 10) {
-        return this._formatInteger(value);
+      if (this._isDetailPercentColumn(label)) {
+        return this._formatPercent(value);
       }
 
-      if (index === 3 || index === 7 || index === 11) {
-        return this._formatPercent(value);
+      if (this._isDetailValueColumn(label) || this._isDetailDeltaColumn(label)) {
+        return this._formatInteger(value);
       }
 
       return String(value || "");
@@ -292,8 +318,12 @@
       `;
     }
 
+    _findKpiTotalRow(rows, year) {
+      return rows.find((row) => row[0] === year && row[1] === "Totale");
+    }
+
     _getKpiTotal(rows, year) {
-      const totalRow = rows.find((row) => row[0] === year && row[1] === "Totale");
+      const totalRow = this._findKpiTotalRow(rows, year);
 
       if (!totalRow) {
         return {
@@ -308,54 +338,69 @@
       };
     }
 
-    _getDetailTotalValues(kpiRows) {
-      const yearY = this._yearFromHeader(this._kpiHeaderY);
-      const yearY1 = this._yearFromHeader(this._kpiHeaderY1);
-      const yearY2 = this._yearFromHeader(this._kpiHeaderY2);
+    _getDetailDeltaValue(label, kpiRows) {
+      const match = String(label || "").match(/^Delta\s+((?:19|20)\d{2})\s+vs\s+((?:19|20)\d{2})/);
 
-      const totalY = this._getKpiTotal(kpiRows, yearY);
-      const totalY1 = this._getKpiTotal(kpiRows, yearY1);
-      const totalY2 = this._getKpiTotal(kpiRows, yearY2);
+      if (!match) {
+        return "";
+      }
 
-      const totalYValue = Number(totalY.value);
-      const totalY1Value = Number(totalY1.value);
-      const totalY2Value = Number(totalY2.value);
+      const totalCurrent = this._findKpiTotalRow(kpiRows, match[1]);
+      const totalPrevious = this._findKpiTotalRow(kpiRows, match[2]);
 
-      const deltaYY1 = Number.isFinite(totalYValue) && Number.isFinite(totalY1Value)
-        ? String(totalYValue - totalY1Value)
-        : "0";
-      const deltaY1Y2 = Number.isFinite(totalY1Value) && Number.isFinite(totalY2Value)
-        ? String(totalY1Value - totalY2Value)
-        : "0";
+      if (!totalCurrent || !totalPrevious) {
+        return "";
+      }
 
-      const values = [
-        "Totali",
-        "",
-        totalY.value,
-        "1",
-        "",
-        deltaYY1,
-        totalY1.value,
-        "1",
-        "",
-        deltaY1Y2,
-        totalY2.value,
-        "1",
-        ""
-      ];
+      const currentValue = Number(totalCurrent[2] || "0");
+      const previousValue = Number(totalPrevious[2] || "0");
 
-      return values;
+      if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) {
+        return "";
+      }
+
+      return String(currentValue - previousValue);
+    }
+
+    _getDetailTotalValues(header, kpiRows) {
+      return header.map((label, index) => {
+        if (index === 0) {
+          return "Totali";
+        }
+
+        if (this._isDetailDateColumn(label) || this._isDetailAbcColumn(label)) {
+          return "";
+        }
+
+        if (this._isDetailValueColumn(label)) {
+          const year = this._yearFromHeader(label);
+          const totalRow = this._findKpiTotalRow(kpiRows, year);
+          return totalRow ? (totalRow[2] || "0") : "";
+        }
+
+        if (this._isDetailPercentColumn(label)) {
+          const year = this._yearFromHeader(label);
+          const totalRow = this._findKpiTotalRow(kpiRows, year);
+          return totalRow ? "1" : "";
+        }
+
+        if (this._isDetailDeltaColumn(label)) {
+          return this._getDetailDeltaValue(label, kpiRows);
+        }
+
+        return "";
+      });
     }
 
     _renderDetailTotalRow(header, kpiRows) {
-      const values = this._getDetailTotalValues(kpiRows);
+      const values = this._getDetailTotalValues(header, kpiRows);
 
       return `
         <tr class="detail-total-row">
-          ${header.map((_, index) => {
+          ${header.map((label, index) => {
             const value = values[index] || "";
-            const isNum = index >= 2 && index !== 4 && index !== 8 && index !== 12;
-            return `<td class="${isNum ? "num" : ""}">${this._formatDetailCell(value, index)}</td>`;
+            const isNum = this._isDetailNumericColumn(label);
+            return `<td class="${isNum ? "num" : ""}">${this._formatDetailCell(value, index, label)}</td>`;
           }).join("")}
         </tr>
       `;
@@ -371,12 +416,12 @@
       }
 
       const csvRows = [header];
-      const totalValues = this._getDetailTotalValues(kpiRows);
+      const totalValues = this._getDetailTotalValues(header, kpiRows);
 
-      csvRows.push(header.map((_, index) => this._formatDetailCellText(totalValues[index] || "", index)));
+      csvRows.push(header.map((label, index) => this._formatDetailCellText(totalValues[index] || "", index, label)));
 
       rows.forEach((row) => {
-        csvRows.push(header.map((_, index) => this._formatDetailCellText(row[index] || "", index)));
+        csvRows.push(header.map((label, index) => this._formatDetailCellText(row[index] || "", index, label)));
       });
 
       return this._rowsToCsv(csvRows);
@@ -458,18 +503,18 @@
             <table class="detail-table">
               <thead>
                 <tr>
-                  ${header.map((cell, index) => `<th class="${index >= 2 ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
+                  ${header.map((cell) => `<th class="${this._isDetailNumericColumn(cell) ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
                 </tr>
               </thead>
               <tbody>
                 ${this._renderDetailTotalRow(header, this._parseRows(this._kpiData))}
                 ${rows.map((row) => `
                   <tr>
-                    ${header.map((_, index) => {
+                    ${header.map((label, index) => {
                       const value = row[index] || "";
-                      const isNum = index >= 2 && index !== 4 && index !== 8 && index !== 12;
-                      const isAbc = index === 4 || index === 8 || index === 12;
-                      return `<td class="${isNum ? "num" : ""} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index)}</td>`;
+                      const isNum = this._isDetailNumericColumn(label);
+                      const isAbc = this._isDetailAbcColumn(label);
+                      return `<td class="${isNum ? "num" : ""} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
                     }).join("")}
                   </tr>
                 `).join("")}
