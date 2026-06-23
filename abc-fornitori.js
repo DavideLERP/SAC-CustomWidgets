@@ -237,10 +237,28 @@
       return String(value || "");
     }
 
-    _renderKpiSection(headerPayload, rows) {
+    _orderKpiRows(rows) {
+      const totalRows = rows.filter((row) => row[1] === "Totale");
+      const detailRows = rows.filter((row) => row[1] !== "Totale");
+
+      return totalRows.concat(detailRows);
+    }
+
+    _renderTableMenu(attributes) {
+      return `
+        <div class="table-menu">
+          <button class="menu-trigger" type="button" aria-label="Azioni tabella">⋮</button>
+          <div class="menu-popover">
+            <button type="button" ${attributes}>Esporta CSV</button>
+          </div>
+        </div>
+      `;
+    }
+
+    _renderKpiSection(headerPayload, rows, sectionKey) {
       const header = this._parseHeader(headerPayload);
       const year = this._yearFromHeader(headerPayload);
-      const yearRows = rows.filter((row) => row[0] === year);
+      const yearRows = this._orderKpiRows(rows.filter((row) => row[0] === year));
 
       if (!year || header.length === 0 || yearRows.length === 0) {
         return "";
@@ -248,7 +266,10 @@
 
       return `
         <section class="kpi-card">
-          <h3>PIVOT ABC ${this._escape(year)}</h3>
+          <div class="card-header">
+            <h3>PIVOT ABC ${this._escape(year)}</h3>
+            ${this._renderTableMenu(`data-export-kpi="${this._escape(sectionKey)}"`)}
+          </div>
           <table class="kpi-table">
             <thead>
               <tr>
@@ -361,46 +382,28 @@
       return this._rowsToCsv(csvRows);
     }
 
-    _buildKpiCsv() {
+    _buildKpiCsvSection(headerPayload) {
       const kpiRows = this._parseRows(this._kpiData);
-      const sections = [
-        {
-          headerPayload: this._kpiHeaderY
-        },
-        {
-          headerPayload: this._kpiHeaderY1
-        },
-        {
-          headerPayload: this._kpiHeaderY2
-        }
-      ];
+      const header = this._parseHeader(headerPayload);
+      const year = this._yearFromHeader(headerPayload);
+      const yearRows = this._orderKpiRows(kpiRows.filter((row) => row[0] === year));
       const csvRows = [];
 
-      sections.forEach((section, sectionIndex) => {
-        const header = this._parseHeader(section.headerPayload);
-        const year = this._yearFromHeader(section.headerPayload);
-        const yearRows = kpiRows.filter((row) => row[0] === year);
+      if (!year || header.length === 0 || yearRows.length === 0) {
+        return "";
+      }
 
-        if (!year || header.length === 0 || yearRows.length === 0) {
-          return;
-        }
+      csvRows.push([`PIVOT ABC ${year}`]);
+      csvRows.push(header);
 
-        if (sectionIndex > 0) {
-          csvRows.push([]);
-        }
-
-        csvRows.push([`PIVOT ABC ${year}`]);
-        csvRows.push(header);
-
-        yearRows.forEach((row) => {
-          csvRows.push([
-            this._formatKpiCellText(row[1], 1),
-            this._formatKpiCellText(row[2], 2),
-            this._formatKpiCellText(row[3], 3),
-            this._formatKpiCellText(row[4], 4),
-            this._formatKpiCellText(row[5], 5)
-          ]);
-        });
+      yearRows.forEach((row) => {
+        csvRows.push([
+          this._formatKpiCellText(row[1], 1),
+          this._formatKpiCellText(row[2], 2),
+          this._formatKpiCellText(row[3], 3),
+          this._formatKpiCellText(row[4], 4),
+          this._formatKpiCellText(row[5], 5)
+        ]);
       });
 
       return this._rowsToCsv(csvRows);
@@ -416,14 +419,25 @@
       this._downloadCsv("ABC_Fornitori_Dettaglio.csv", csv);
     }
 
-    _exportKpi() {
-      const csv = this._buildKpiCsv();
+    _exportKpi(sectionKey) {
+      let headerPayload = "";
+
+      if (sectionKey === "Y") {
+        headerPayload = this._kpiHeaderY;
+      } else if (sectionKey === "Y1") {
+        headerPayload = this._kpiHeaderY1;
+      } else if (sectionKey === "Y2") {
+        headerPayload = this._kpiHeaderY2;
+      }
+
+      const year = this._yearFromHeader(headerPayload);
+      const csv = this._buildKpiCsvSection(headerPayload);
 
       if (!csv) {
         return;
       }
 
-      this._downloadCsv("ABC_Fornitori_KPI.csv", csv);
+      this._downloadCsv("ABC_Fornitori_KPI_" + year + ".csv", csv);
     }
 
     _renderDetailTable(header, rows) {
@@ -437,6 +451,10 @@
 
       return `
         <section class="detail-card">
+          <div class="detail-toolbar">
+            <span>Dettaglio fornitori</span>
+            ${this._renderTableMenu("data-export-detail")}
+          </div>
           <div class="table-wrap">
             <table class="detail-table">
               <thead>
@@ -528,23 +546,6 @@
             white-space: nowrap;
           }
 
-          .export-button {
-            height: 26px;
-            border: 1px solid #b8bec7;
-            border-radius: 2px;
-            padding: 0 10px;
-            background: #ffffff;
-            color: #32363a;
-            font: inherit;
-            font-size: 12px;
-            cursor: pointer;
-          }
-
-          .export-button:hover {
-            background: #f3f6f9;
-            border-color: #6a6d70;
-          }
-
           .kpi-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(250px, 1fr));
@@ -560,14 +561,78 @@
             overflow: hidden;
           }
 
-          .kpi-card h3 {
-            margin: 0;
+          .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
             padding: 7px 9px;
             background: ${this._accentColor};
+          }
+
+          .kpi-card h3 {
+            margin: 0;
             color: #111827;
             font-size: 12px;
             line-height: 1.2;
             font-weight: 700;
+          }
+
+          .table-menu {
+            position: relative;
+            flex: 0 0 auto;
+          }
+
+          .menu-trigger {
+            width: 24px;
+            height: 24px;
+            border: 0;
+            border-radius: 2px;
+            background: transparent;
+            color: #32363a;
+            font-size: 18px;
+            line-height: 20px;
+            cursor: pointer;
+          }
+
+          .menu-trigger:hover,
+          .table-menu:focus-within .menu-trigger {
+            background: rgba(0, 0, 0, 0.08);
+          }
+
+          .menu-popover {
+            display: none;
+            position: absolute;
+            top: 26px;
+            right: 0;
+            z-index: 20;
+            min-width: 128px;
+            padding: 4px 0;
+            border: 1px solid #d7dce3;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          }
+
+          .table-menu:hover .menu-popover,
+          .table-menu:focus-within .menu-popover {
+            display: block;
+          }
+
+          .menu-popover button {
+            width: 100%;
+            height: 28px;
+            border: 0;
+            padding: 0 12px;
+            background: transparent;
+            color: #32363a;
+            font: inherit;
+            font-size: 12px;
+            text-align: left;
+            cursor: pointer;
+          }
+
+          .menu-popover button:hover {
+            background: #eef3f7;
           }
 
           table {
@@ -611,10 +676,26 @@
           .detail-card {
             min-height: 0;
             flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .detail-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-height: 30px;
+            padding: 3px 8px;
+            border-bottom: 1px solid #d7dce3;
+            background: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
           }
 
           .table-wrap {
-            height: 100%;
+            min-height: 0;
+            flex: 1 1 auto;
             overflow: auto;
           }
 
@@ -671,32 +752,30 @@
           <div class="title-row">
             <h2>${this._escape(this._title)}</h2>
             <div class="title-actions">
-              <button class="export-button" type="button" data-export="detail">Esporta dettaglio</button>
-              <button class="export-button" type="button" data-export="kpi">Esporta KPI</button>
               <div class="badge">${detailRows.length} fornitori</div>
             </div>
           </div>
 
           <div class="kpi-grid">
-            ${this._renderKpiSection(this._kpiHeaderY, kpiRows)}
-            ${this._renderKpiSection(this._kpiHeaderY1, kpiRows)}
-            ${this._renderKpiSection(this._kpiHeaderY2, kpiRows)}
+            ${this._renderKpiSection(this._kpiHeaderY, kpiRows, "Y")}
+            ${this._renderKpiSection(this._kpiHeaderY1, kpiRows, "Y1")}
+            ${this._renderKpiSection(this._kpiHeaderY2, kpiRows, "Y2")}
           </div>
 
           ${this._renderDetailTable(detailHeader, detailRows)}
         </div>
       `;
 
-      const detailButton = this.shadowRoot.querySelector('[data-export="detail"]');
-      const kpiButton = this.shadowRoot.querySelector('[data-export="kpi"]');
+      const detailButton = this.shadowRoot.querySelector("[data-export-detail]");
+      const kpiButtons = this.shadowRoot.querySelectorAll("[data-export-kpi]");
 
       if (detailButton) {
         detailButton.addEventListener("click", () => this._exportDetail());
       }
 
-      if (kpiButton) {
-        kpiButton.addEventListener("click", () => this._exportKpi());
-      }
+      kpiButtons.forEach((button) => {
+        button.addEventListener("click", () => this._exportKpi(button.getAttribute("data-export-kpi")));
+      });
     }
 
     _escape(value) {

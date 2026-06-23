@@ -1,0 +1,100 @@
+{
+  "eula": "",
+  "vendor": "Local Prototype",
+  "license": "",
+  "id": "com.example.sac.abcfornitori",
+  "version": "0.1.3",
+  "name": "ABC Fornitori",
+  "newInstancePrefix": "ABCFornitori",
+  "description": "Frontend ABC supplier analysis tables for SAP Analytics Cloud stories.",
+  "webcomponents": [
+    {
+      "kind": "main",
+      "tag": "com-example-sac-abc-fornitori",
+      "url": "https://davidelerp.github.io/SAC-CustomWidgets/abc-fornitori.js?v=0.1.3",
+      "integrity": "",
+      "ignoreIntegrity": true
+    }
+  ],
+  "properties": {
+    "width": {
+      "type": "integer",
+      "default": 1280
+    },
+    "height": {
+      "type": "integer",
+      "default": 720
+    },
+    "title": {
+      "type": "string",
+      "default": "Analisi ABC Fornitori"
+    },
+    "accentColor": {
+      "type": "string",
+      "default": "#f0ab00"
+    }
+  },
+  "methods": {
+    "setDetailHeader": {
+      "description": "Sets the detail table header payload.",
+      "parameters": [
+        {
+          "name": "payload",
+          "type": "string",
+          "description": "Tab-separated detail header payload"
+        }
+      ]
+    },
+    "setDetailData": {
+      "description": "Sets the detail table data payload.",
+      "parameters": [
+        {
+          "name": "payload",
+          "type": "string",
+          "description": "Tab/newline-separated detail data payload"
+        }
+      ]
+    },
+    "setKpiHeaderY": {
+      "description": "Sets the KPI header for current year.",
+      "parameters": [
+        {
+          "name": "payload",
+          "type": "string",
+          "description": "Tab-separated KPI header payload"
+        }
+      ]
+    },
+    "setKpiHeaderY1": {
+      "description": "Sets the KPI header for previous year.",
+      "parameters": [
+        {
+          "name": "payload",
+          "type": "string",
+          "description": "Tab-separated KPI header payload"
+        }
+      ]
+    },
+    "setKpiHeaderY2": {
+      "description": "Sets the KPI header for two years before current year.",
+      "parameters": [
+        {
+          "name": "payload",
+          "type": "string",
+          "description": "Tab-separated KPI header payload"
+        }
+      ]
+    },
+    "setKpiData": {
+      "description": "Sets the KPI data payload.",
+      "parameters": [
+        {
+          "name": "payload",
+          "type": "string",
+          "description": "Tab/newline-separated KPI data payload"
+        }
+      ]
+    }
+  },
+  "events": {}
+}
