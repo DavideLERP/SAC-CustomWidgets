@@ -51,6 +51,29 @@
       this._render();
     }
 
+    clearDetailData() {
+      this._detailData = "";
+      this._render();
+    }
+
+    appendDetailData(payload) {
+      const chunk = payload || "";
+
+      if (!chunk) {
+        return;
+      }
+
+      if (this._detailData && this._detailData.slice(-1) !== "\n") {
+        this._detailData += "\n";
+      }
+
+      this._detailData += chunk;
+    }
+
+    renderDetailData() {
+      this._render();
+    }
+
     setKpiHeaderY(payload) {
       this._kpiHeaderY = payload || "";
       this._render();
