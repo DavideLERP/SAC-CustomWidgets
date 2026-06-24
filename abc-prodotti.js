@@ -53,7 +53,6 @@
 
     clearDetailData() {
       this._detailData = "";
-      this._render();
     }
 
     appendDetailData(payload) {
