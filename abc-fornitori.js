@@ -590,26 +590,12 @@
             min-height: 28px;
           }
 
-          .title-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-
           h2 {
             margin: 0;
             font-size: 18px;
             line-height: 1.2;
             font-weight: 700;
             color: #111111;
-          }
-
-          .badge {
-            border-left: 4px solid ${this._accentColor};
-            padding-left: 8px;
-            font-size: 12px;
-            color: #58595b;
-            white-space: nowrap;
           }
 
           .kpi-grid {
@@ -835,9 +821,6 @@
         <div class="shell">
           <div class="title-row">
             <h2>${this._escape(this._title)}</h2>
-            <div class="title-actions">
-              <div class="badge">${detailRows.length} fornitori</div>
-            </div>
           </div>
 
           <div class="kpi-grid">
