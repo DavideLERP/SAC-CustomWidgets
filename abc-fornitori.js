@@ -199,6 +199,10 @@
         || this._isDetailDeltaColumn(label);
     }
 
+    _isDetailRightAlignedColumn(label, index) {
+      return index > 1 && !this._isDetailDateColumn(label);
+    }
+
     _getDeltaClass(value) {
       const text = String(value || "").trim();
 
@@ -415,9 +419,9 @@
         <tr class="detail-total-row">
           ${header.map((label, index) => {
             const value = values[index] || "";
-            const isNum = this._isDetailNumericColumn(label);
+            const alignRight = this._isDetailRightAlignedColumn(label, index);
             const deltaClass = this._isDetailDeltaColumn(label) ? this._getDeltaClass(value) : "";
-            return `<td class="${isNum ? "num" : ""} ${deltaClass}">${this._formatDetailCell(value, index, label)}</td>`;
+            return `<td class="${alignRight ? "num" : ""} ${deltaClass}">${this._formatDetailCell(value, index, label)}</td>`;
           }).join("")}
         </tr>
       `;
@@ -520,7 +524,7 @@
             <table class="detail-table">
               <thead>
                 <tr>
-                  ${header.map((cell) => `<th class="${this._isDetailNumericColumn(cell) ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
+                  ${header.map((cell, index) => `<th class="${this._isDetailRightAlignedColumn(cell, index) ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
                 </tr>
               </thead>
               <tbody>
@@ -529,10 +533,10 @@
                   <tr>
                     ${header.map((label, index) => {
                       const value = row[index] || "";
-                      const isNum = this._isDetailNumericColumn(label);
+                      const alignRight = this._isDetailRightAlignedColumn(label, index);
                       const isAbc = this._isDetailAbcColumn(label);
                       const deltaClass = this._isDetailDeltaColumn(label) ? this._getDeltaClass(value) : "";
-                      return `<td class="${isNum ? "num" : ""} ${deltaClass} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
+                      return `<td class="${alignRight ? "num" : ""} ${deltaClass} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
                     }).join("")}
                   </tr>
                 `).join("")}
@@ -799,7 +803,7 @@
           }
 
           .abc {
-            text-align: center;
+            text-align: right;
             font-weight: 700;
           }
 
