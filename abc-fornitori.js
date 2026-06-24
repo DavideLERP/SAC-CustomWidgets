@@ -655,7 +655,8 @@
           }
 
           .menu-trigger:hover,
-          .table-menu:focus-within .menu-trigger {
+          .table-menu:focus-within .menu-trigger,
+          .table-menu.is-open .menu-trigger {
             background: rgba(0, 0, 0, 0.08);
           }
 
@@ -672,8 +673,7 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
           }
 
-          .table-menu:hover .menu-popover,
-          .table-menu:focus-within .menu-popover {
+          .table-menu.is-open .menu-popover {
             display: block;
           }
 
@@ -843,13 +843,47 @@
 
       const detailButton = this.shadowRoot.querySelector("[data-export-detail]");
       const kpiButtons = this.shadowRoot.querySelectorAll("[data-export-kpi]");
+      const menuTriggers = this.shadowRoot.querySelectorAll(".menu-trigger");
+
+      menuTriggers.forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+
+          const menu = button.closest(".table-menu");
+          const wasOpen = menu && menu.classList.contains("is-open");
+
+          this._closeMenus();
+
+          if (menu && !wasOpen) {
+            menu.classList.add("is-open");
+          }
+        });
+      });
+
+      this.shadowRoot.addEventListener("click", (event) => {
+        if (!event.target.closest(".table-menu")) {
+          this._closeMenus();
+        }
+      });
 
       if (detailButton) {
-        detailButton.addEventListener("click", () => this._exportDetail());
+        detailButton.addEventListener("click", () => {
+          this._closeMenus();
+          this._exportDetail();
+        });
       }
 
       kpiButtons.forEach((button) => {
-        button.addEventListener("click", () => this._exportKpi(button.getAttribute("data-export-kpi")));
+        button.addEventListener("click", () => {
+          this._closeMenus();
+          this._exportKpi(button.getAttribute("data-export-kpi"));
+        });
+      });
+    }
+
+    _closeMenus() {
+      this.shadowRoot.querySelectorAll(".table-menu.is-open").forEach((menu) => {
+        menu.classList.remove("is-open");
       });
     }
 
