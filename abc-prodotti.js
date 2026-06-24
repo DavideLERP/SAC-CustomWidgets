@@ -647,6 +647,13 @@
             border: 1px solid #d7dce3;
             border-radius: 2px;
             background: #ffffff;
+          }
+
+          .kpi-card {
+            overflow: visible;
+          }
+
+          .detail-card {
             overflow: hidden;
           }
 
@@ -714,8 +721,9 @@
             padding: 0 12px;
             background: transparent;
             color: #32363a;
-            font: inherit;
             font-size: 12px;
+            font-family: "72", Arial, sans-serif;
+            font-weight: 400;
             text-align: left;
             cursor: pointer;
           }
