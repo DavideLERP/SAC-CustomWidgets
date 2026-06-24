@@ -199,6 +199,22 @@
         || this._isDetailDeltaColumn(label);
     }
 
+    _getDeltaClass(value) {
+      const text = String(value || "").trim();
+
+      if (text === "") {
+        return "";
+      }
+
+      const num = Number(text);
+
+      if (!Number.isFinite(num)) {
+        return "";
+      }
+
+      return num >= 0 ? "delta-positive" : "delta-negative";
+    }
+
     _formatDetailCell(value, index, label) {
       if (this._isDetailDateColumn(label)) {
         return this._formatDate(value);
@@ -400,7 +416,8 @@
           ${header.map((label, index) => {
             const value = values[index] || "";
             const isNum = this._isDetailNumericColumn(label);
-            return `<td class="${isNum ? "num" : ""}">${this._formatDetailCell(value, index, label)}</td>`;
+            const deltaClass = this._isDetailDeltaColumn(label) ? this._getDeltaClass(value) : "";
+            return `<td class="${isNum ? "num" : ""} ${deltaClass}">${this._formatDetailCell(value, index, label)}</td>`;
           }).join("")}
         </tr>
       `;
@@ -514,7 +531,8 @@
                       const value = row[index] || "";
                       const isNum = this._isDetailNumericColumn(label);
                       const isAbc = this._isDetailAbcColumn(label);
-                      return `<td class="${isNum ? "num" : ""} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
+                      const deltaClass = this._isDetailDeltaColumn(label) ? this._getDeltaClass(value) : "";
+                      return `<td class="${isNum ? "num" : ""} ${deltaClass} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
                     }).join("")}
                   </tr>
                 `).join("")}
@@ -768,6 +786,16 @@
             font-weight: 700;
             background: #ffffff;
             border-bottom: 1px solid #4f5255;
+          }
+
+          .detail-table td.delta-positive,
+          .detail-total-row td.delta-positive {
+            background: #dce9df;
+          }
+
+          .detail-table td.delta-negative,
+          .detail-total-row td.delta-negative {
+            background: #efcccc;
           }
 
           .abc {
