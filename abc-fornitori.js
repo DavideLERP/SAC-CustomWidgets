@@ -426,7 +426,23 @@
       return String(currentValue - previousValue);
     }
 
-    _getDetailTotalValues(header, kpiRows) {
+    _sumDetailColumn(rows, index) {
+      let total = 0;
+
+      rows.forEach((row) => {
+        const value = Number(row[index] || "0");
+
+        if (Number.isFinite(value)) {
+          total += value;
+        }
+      });
+
+      return String(total);
+    }
+
+    _getDetailTotalValues(header, kpiRows, detailRows) {
+      const rows = detailRows || [];
+
       return header.map((label, index) => {
         if (index === 0) {
           return "Totali";
@@ -437,12 +453,20 @@
         }
 
         if (this._isDetailValueColumn(label)) {
+          if (rows.length > 0) {
+            return this._sumDetailColumn(rows, index);
+          }
+
           const year = this._yearFromHeader(label);
           const totalRow = this._findKpiTotalRow(kpiRows, year);
           return totalRow ? (totalRow[2] || "0") : "";
         }
 
         if (this._isDetailPercentColumn(label)) {
+          if (rows.length > 0) {
+            return "1";
+          }
+
           const year = this._yearFromHeader(label);
           const totalRow = this._findKpiTotalRow(kpiRows, year);
           return totalRow ? "1" : "";
@@ -456,8 +480,8 @@
       });
     }
 
-    _renderDetailTotalRow(header, kpiRows) {
-      const values = this._getDetailTotalValues(header, kpiRows);
+    _renderDetailTotalRow(header, kpiRows, detailRows) {
+      const values = this._getDetailTotalValues(header, kpiRows, detailRows);
 
       return `
         <tr class="detail-total-row">
@@ -514,7 +538,7 @@
 
     _renderDetailVirtualBody(header, rows, kpiRows, virtualWindow) {
       return `
-        ${this._renderDetailTotalRow(header, kpiRows)}
+        ${this._renderDetailTotalRow(header, kpiRows, rows)}
         ${this._renderDetailSpacer(virtualWindow.topHeight, header.length)}
         ${this._renderDetailRows(header, rows.slice(virtualWindow.start, virtualWindow.end))}
         ${this._renderDetailSpacer(virtualWindow.bottomHeight, header.length)}
@@ -586,7 +610,7 @@
       }
 
       const csvRows = [header];
-      const totalValues = this._getDetailTotalValues(header, kpiRows);
+      const totalValues = this._getDetailTotalValues(header, kpiRows, rows);
 
       csvRows.push(header.map((label, index) => this._formatDetailCellText(totalValues[index] || "", index, label)));
 
