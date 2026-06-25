@@ -14,11 +14,13 @@
       this._kpiHeaderY2 = "";
       this._kpiData = "";
       this._openMenu = null;
+      this._renderQueued = false;
+      this._renderTimer = 0;
     }
 
     set title(value) {
       this._title = value || "Analisi ABC Prodotti";
-      this._render();
+      this._scheduleRender();
     }
 
     get title() {
@@ -27,7 +29,7 @@
 
     set accentColor(value) {
       this._accentColor = value || "#f0ab00";
-      this._render();
+      this._scheduleRender();
     }
 
     get accentColor() {
@@ -39,17 +41,17 @@
     }
 
     onCustomWidgetAfterUpdate() {
-      this._render();
+      this._scheduleRender();
     }
 
     setDetailHeader(payload) {
       this._detailHeader = payload || "";
-      this._render();
+      this._scheduleRender();
     }
 
     setDetailData(payload) {
       this._detailData = payload || "";
-      this._render();
+      this._scheduleRender();
     }
 
     clearDetailData() {
@@ -71,26 +73,49 @@
     }
 
     renderDetailData() {
-      this._render();
+      this._flushRender();
     }
 
     setKpiHeaderY(payload) {
       this._kpiHeaderY = payload || "";
-      this._render();
+      this._scheduleRender();
     }
 
     setKpiHeaderY1(payload) {
       this._kpiHeaderY1 = payload || "";
-      this._render();
+      this._scheduleRender();
     }
 
     setKpiHeaderY2(payload) {
       this._kpiHeaderY2 = payload || "";
-      this._render();
+      this._scheduleRender();
     }
 
     setKpiData(payload) {
       this._kpiData = payload || "";
+      this._scheduleRender();
+    }
+
+    _scheduleRender() {
+      if (this._renderQueued) {
+        return;
+      }
+
+      this._renderQueued = true;
+      this._renderTimer = setTimeout(() => {
+        this._renderQueued = false;
+        this._renderTimer = 0;
+        this._render();
+      }, 0);
+    }
+
+    _flushRender() {
+      if (this._renderQueued) {
+        clearTimeout(this._renderTimer);
+        this._renderQueued = false;
+        this._renderTimer = 0;
+      }
+
       this._render();
     }
 
