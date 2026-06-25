@@ -364,6 +364,116 @@
       return totalRows.concat(detailRows);
     }
 
+    _getDetailYearColumns(header, year) {
+      return {
+        value: header.indexOf("Val. Netto " + year),
+        quantity: header.indexOf("Qt. " + year),
+        abc: header.indexOf("ABC " + year)
+      };
+    }
+
+    _toNumber(value) {
+      const num = Number(value || "0");
+      return Number.isFinite(num) ? num : 0;
+    }
+
+    _buildKpiRowsForYear(year, header, rows) {
+      const columns = this._getDetailYearColumns(header, year);
+
+      if (!year || columns.value < 0 || columns.quantity < 0 || columns.abc < 0) {
+        return [];
+      }
+
+      const stats = {
+        A: { value: 0, quantity: 0, count: 0 },
+        B: { value: 0, quantity: 0, count: 0 },
+        C: { value: 0, quantity: 0, count: 0 }
+      };
+      const total = { value: 0, quantity: 0, count: 0 };
+
+      rows.forEach((row) => {
+        const value = this._toNumber(row[columns.value]);
+        const quantity = this._toNumber(row[columns.quantity]);
+        const abc = String(row[columns.abc] || "").trim();
+
+        if (value !== 0 || quantity !== 0) {
+          total.value += value;
+          total.quantity += quantity;
+          total.count += 1;
+        }
+
+        if (stats[abc]) {
+          stats[abc].value += value;
+          stats[abc].quantity += quantity;
+          stats[abc].count += 1;
+        }
+      });
+
+      const classified = {
+        value: stats.A.value + stats.B.value + stats.C.value,
+        quantity: stats.A.quantity + stats.B.quantity + stats.C.quantity,
+        count: stats.A.count + stats.B.count + stats.C.count
+      };
+      const nonClassified = {
+        value: total.value - classified.value,
+        quantity: total.quantity - classified.quantity,
+        count: total.count - classified.count
+      };
+      const rowsOut = [];
+      const addRow = (label, values) => {
+        rowsOut.push([
+          year,
+          label,
+          String(values.value),
+          String(values.quantity),
+          String(values.count),
+          String(total.value !== 0 ? values.value / total.value : 0),
+          String(total.count !== 0 ? values.count / total.count : 0)
+        ]);
+      };
+
+      addRow("A", stats.A);
+      addRow("B", stats.B);
+      addRow("C", stats.C);
+
+      if (nonClassified.value !== 0 || nonClassified.quantity !== 0 || nonClassified.count !== 0) {
+        addRow("Non class.", nonClassified);
+      }
+
+      rowsOut.push([
+        year,
+        "Totale",
+        String(total.value),
+        String(total.quantity),
+        String(total.count),
+        "1",
+        "1"
+      ]);
+
+      return rowsOut;
+    }
+
+    _buildKpiRowsFromDetail(header, rows) {
+      const sections = [this._kpiHeaderY, this._kpiHeaderY1, this._kpiHeaderY2];
+      let kpiRows = [];
+
+      sections.forEach((sectionHeader) => {
+        kpiRows = kpiRows.concat(this._buildKpiRowsForYear(this._yearFromHeader(sectionHeader), header, rows));
+      });
+
+      return kpiRows;
+    }
+
+    _getKpiRows(detailHeader, detailRows) {
+      const explicitRows = this._parseRows(this._kpiData);
+
+      if (explicitRows.length > 0) {
+        return explicitRows;
+      }
+
+      return this._buildKpiRowsFromDetail(detailHeader, detailRows);
+    }
+
     _renderTableMenu(attributes) {
       return `
         <div class="table-menu">
@@ -663,8 +773,10 @@
     }
 
     _buildKpiCsvSection(headerPayload) {
-      const kpiRows = this._parseRows(this._kpiData);
       const header = this._parseHeader(headerPayload);
+      const detailHeader = this._parseHeader(this._detailHeader);
+      const detailRows = this._parseRows(this._detailData);
+      const kpiRows = this._getKpiRows(detailHeader, detailRows);
       const year = this._yearFromHeader(headerPayload);
       const yearRows = this._orderKpiRows(kpiRows.filter((row) => row[0] === year));
       const csvRows = [];
@@ -762,7 +874,7 @@
 
       const detailHeader = this._parseHeader(this._detailHeader);
       const detailRows = this._parseRows(this._detailData);
-      const kpiRows = this._parseRows(this._kpiData);
+      const kpiRows = this._getKpiRows(detailHeader, detailRows);
 
       this._detailHeaderCache = detailHeader;
       this._detailRowsCache = detailRows;
