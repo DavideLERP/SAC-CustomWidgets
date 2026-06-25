@@ -16,6 +16,16 @@
       this._openMenu = null;
       this._renderQueued = false;
       this._renderTimer = 0;
+      this._detailHeaderCache = [];
+      this._detailRowsCache = [];
+      this._kpiRowsCache = [];
+      this._detailScrollTop = 0;
+      this._detailVirtualStart = -1;
+      this._detailVirtualEnd = -1;
+      this._detailScrollFrame = 0;
+      this._detailRowHeight = 24;
+      this._detailVirtualBuffer = 18;
+      this._detailStickyOffset = 49;
     }
 
     set title(value) {
@@ -51,11 +61,13 @@
 
     setDetailData(payload) {
       this._detailData = payload || "";
+      this._resetDetailViewport();
       this._scheduleRender();
     }
 
     clearDetailData() {
       this._detailData = "";
+      this._resetDetailViewport();
     }
 
     appendDetailData(payload) {
@@ -94,6 +106,13 @@
     setKpiData(payload) {
       this._kpiData = payload || "";
       this._scheduleRender();
+    }
+
+    _resetDetailViewport() {
+      this._detailScrollTop = 0;
+      this._detailVirtualStart = -1;
+      this._detailVirtualEnd = -1;
+      this._detailScrollFrame = 0;
     }
 
     _scheduleRender() {
@@ -489,6 +508,111 @@
       `;
     }
 
+    _getDetailVirtualWindow(rowCount, viewportHeight, scrollTop) {
+      const rowHeight = this._detailRowHeight;
+      const buffer = this._detailVirtualBuffer;
+      const safeViewportHeight = Math.max(rowHeight * 8, Number(viewportHeight) || rowHeight * 18);
+      const safeScrollTop = Math.max(0, Number(scrollTop) || 0);
+      const dataScrollTop = Math.max(0, safeScrollTop - this._detailStickyOffset);
+      const firstVisible = Math.floor(dataScrollTop / rowHeight);
+      const visibleCount = Math.ceil(safeViewportHeight / rowHeight) + (buffer * 2);
+      const start = Math.max(0, firstVisible - buffer);
+      const end = Math.min(rowCount, start + visibleCount);
+
+      return {
+        start,
+        end,
+        topHeight: start * rowHeight,
+        bottomHeight: Math.max(0, rowCount - end) * rowHeight
+      };
+    }
+
+    _renderDetailSpacer(height, colSpan) {
+      if (height <= 0) {
+        return "";
+      }
+
+      return `<tr class="virtual-spacer"><td colspan="${colSpan}" style="height:${height}px"></td></tr>`;
+    }
+
+    _renderDetailRows(header, rows) {
+      return rows.map((row) => `
+        <tr>
+          ${header.map((label, index) => {
+            const value = row[index] || "";
+            const alignRight = this._isDetailRightAlignedColumn(label, index);
+            const isAbc = this._isDetailAbcColumn(label);
+            const deltaClass = this._isDetailDeltaColumn(label) ? this._getDeltaClass(value) : "";
+            return `<td class="${alignRight ? "num" : ""} ${deltaClass} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
+          }).join("")}
+        </tr>
+      `).join("");
+    }
+
+    _renderDetailVirtualBody(header, rows, kpiRows, virtualWindow) {
+      return `
+        ${this._renderDetailTotalRow(header, kpiRows)}
+        ${this._renderDetailSpacer(virtualWindow.topHeight, header.length)}
+        ${this._renderDetailRows(header, rows.slice(virtualWindow.start, virtualWindow.end))}
+        ${this._renderDetailSpacer(virtualWindow.bottomHeight, header.length)}
+      `;
+    }
+
+    _syncVirtualDetailRows(force) {
+      const body = this.shadowRoot.querySelector("[data-detail-body]");
+      const wrap = this.shadowRoot.querySelector("[data-detail-scroll]");
+
+      if (!body || !wrap || this._detailHeaderCache.length === 0 || this._detailRowsCache.length === 0) {
+        return;
+      }
+
+      const virtualWindow = this._getDetailVirtualWindow(
+        this._detailRowsCache.length,
+        wrap.clientHeight,
+        wrap.scrollTop
+      );
+
+      if (!force && virtualWindow.start === this._detailVirtualStart && virtualWindow.end === this._detailVirtualEnd) {
+        return;
+      }
+
+      this._detailVirtualStart = virtualWindow.start;
+      this._detailVirtualEnd = virtualWindow.end;
+      body.innerHTML = this._renderDetailVirtualBody(
+        this._detailHeaderCache,
+        this._detailRowsCache,
+        this._kpiRowsCache,
+        virtualWindow
+      );
+    }
+
+    _attachDetailVirtualScroll() {
+      const wrap = this.shadowRoot.querySelector("[data-detail-scroll]");
+
+      if (!wrap) {
+        return;
+      }
+
+      if (this._detailScrollTop > 0) {
+        wrap.scrollTop = Math.min(this._detailScrollTop, Math.max(0, wrap.scrollHeight - wrap.clientHeight));
+      }
+
+      wrap.addEventListener("scroll", () => {
+        this._detailScrollTop = wrap.scrollTop;
+
+        if (this._detailScrollFrame) {
+          return;
+        }
+
+        this._detailScrollFrame = requestAnimationFrame(() => {
+          this._detailScrollFrame = 0;
+          this._syncVirtualDetailRows(false);
+        });
+      });
+
+      this._syncVirtualDetailRows(true);
+    }
+
     _buildDetailCsv() {
       const header = this._parseHeader(this._detailHeader);
       const rows = this._parseRows(this._detailData);
@@ -569,7 +693,7 @@
       this._downloadCsv("ABC_Prodotti_KPI_" + year + ".csv", csv);
     }
 
-    _renderDetailTable(header, rows) {
+    _renderDetailTable(header, rows, kpiRows) {
       if (header.length === 0 || rows.length === 0) {
         return `
           <div class="empty">
@@ -578,31 +702,22 @@
         `;
       }
 
+      const virtualWindow = this._getDetailVirtualWindow(rows.length, this._detailRowHeight * 22, this._detailScrollTop);
+
       return `
         <section class="detail-card">
           <div class="detail-toolbar">
             ${this._renderTableMenu("data-export-detail")}
           </div>
-          <div class="table-wrap">
+          <div class="table-wrap" data-detail-scroll>
             <table class="detail-table">
               <thead>
                 <tr>
                   ${header.map((cell, index) => `<th class="${this._isDetailRightAlignedColumn(cell, index) ? "num" : ""}">${this._escape(cell)}</th>`).join("")}
                 </tr>
               </thead>
-              <tbody>
-                ${this._renderDetailTotalRow(header, this._parseRows(this._kpiData))}
-                ${rows.map((row) => `
-                  <tr>
-                    ${header.map((label, index) => {
-                      const value = row[index] || "";
-                      const alignRight = this._isDetailRightAlignedColumn(label, index);
-                      const isAbc = this._isDetailAbcColumn(label);
-                      const deltaClass = this._isDetailDeltaColumn(label) ? this._getDeltaClass(value) : "";
-                      return `<td class="${alignRight ? "num" : ""} ${deltaClass} ${isAbc ? `abc abc-${this._escape(value)}` : ""}">${this._formatDetailCell(value, index, label)}</td>`;
-                    }).join("")}
-                  </tr>
-                `).join("")}
+              <tbody data-detail-body>
+                ${this._renderDetailVirtualBody(header, rows, kpiRows, virtualWindow)}
               </tbody>
             </table>
           </div>
@@ -620,6 +735,13 @@
       const detailHeader = this._parseHeader(this._detailHeader);
       const detailRows = this._parseRows(this._detailData);
       const kpiRows = this._parseRows(this._kpiData);
+
+      this._detailHeaderCache = detailHeader;
+      this._detailRowsCache = detailRows;
+      this._kpiRowsCache = kpiRows;
+      this._detailVirtualStart = -1;
+      this._detailVirtualEnd = -1;
+      this._detailScrollFrame = 0;
 
       this.shadowRoot.innerHTML = `
         <style>
@@ -836,10 +958,23 @@
             min-width: 1480px;
           }
 
+          .detail-table th,
+          .detail-table td {
+            white-space: nowrap;
+          }
+
           .detail-table thead th {
             position: sticky;
             top: 0;
             z-index: 4;
+          }
+
+          .virtual-spacer td {
+            height: 0;
+            padding: 0;
+            border: 0;
+            line-height: 0;
+            font-size: 0;
           }
 
           .detail-total-row td {
@@ -902,7 +1037,7 @@
             ${this._renderKpiSection(this._kpiHeaderY2, kpiRows, "Y2")}
           </div>
 
-          ${this._renderDetailTable(detailHeader, detailRows)}
+          ${this._renderDetailTable(detailHeader, detailRows, kpiRows)}
         </div>
       `;
 
@@ -945,6 +1080,8 @@
           this._exportKpi(button.getAttribute("data-export-kpi"));
         });
       });
+
+      this._attachDetailVirtualScroll();
     }
 
     _closeMenus() {
