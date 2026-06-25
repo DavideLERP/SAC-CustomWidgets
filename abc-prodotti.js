@@ -13,6 +13,7 @@
       this._kpiHeaderY1 = "";
       this._kpiHeaderY2 = "";
       this._kpiData = "";
+      this._openMenu = null;
     }
 
     set title(value) {
@@ -589,6 +590,8 @@
         return;
       }
 
+      this._openMenu = null;
+
       const detailHeader = this._parseHeader(this._detailHeader);
       const detailRows = this._parseRows(this._detailData);
       const kpiRows = this._parseRows(this._kpiData);
@@ -893,6 +896,7 @@
 
           if (menu && !wasOpen) {
             menu.classList.add("is-open");
+            this._openMenu = menu;
           }
         });
       });
@@ -919,9 +923,10 @@
     }
 
     _closeMenus() {
-      this.shadowRoot.querySelectorAll(".table-menu.is-open").forEach((menu) => {
-        menu.classList.remove("is-open");
-      });
+      if (this._openMenu) {
+        this._openMenu.classList.remove("is-open");
+        this._openMenu = null;
+      }
     }
 
     _escape(value) {
