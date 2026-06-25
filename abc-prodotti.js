@@ -23,6 +23,7 @@
       this._detailVirtualStart = -1;
       this._detailVirtualEnd = -1;
       this._detailScrollFrame = 0;
+      this._detailRenderTimer = 0;
       this._detailRowHeight = 24;
       this._detailVirtualBuffer = 18;
       this._detailStickyOffset = 49;
@@ -82,10 +83,11 @@
       }
 
       this._detailData += chunk;
+      this._scheduleDetailRender();
     }
 
     renderDetailData() {
-      this._flushRender();
+      this._scheduleDetailRender();
     }
 
     setKpiHeaderY(payload) {
@@ -136,6 +138,17 @@
       }
 
       this._render();
+    }
+
+    _scheduleDetailRender() {
+      if (this._detailRenderTimer) {
+        clearTimeout(this._detailRenderTimer);
+      }
+
+      this._detailRenderTimer = setTimeout(() => {
+        this._detailRenderTimer = 0;
+        this._flushRender();
+      }, 50);
     }
 
     _downloadCsv(filename, content) {
