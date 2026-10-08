@@ -450,7 +450,7 @@
       addRow("C", stats.C);
 
       if (nonClassified.value !== 0 || nonClassified.quantity !== 0 || nonClassified.count !== 0) {
-        addRow("Non class.", nonClassified);
+        addRow("Non classificato", nonClassified);
       }
 
       rowsOut.push([
